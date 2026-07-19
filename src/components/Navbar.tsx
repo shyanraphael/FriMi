@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6,10 +5,10 @@ import {
   SearchIcon,
   SunIcon,
   MoonIcon,
-  FilmIcon,
   MenuIcon,
   XIcon } from
 'lucide-react';
+import { RiMovie2Fill } from 'react-icons/ri';
 import { useTheme } from '../context/ThemeContext';
 
 const links = [
@@ -49,10 +48,8 @@ export function Navbar() {
         }>
         
         <Link to="/" className="flex items-center gap-2 pr-2">
-          <div className="grid h-8 w-8 place-items-center rounded-xl bg-accent text-white">
-            <FilmIcon className="h-4 w-4" />
-          </div>
-          <span className="text-lg font-extrabold tracking-tight">FriMi</span>
+          <RiMovie2Fill className="h-7 w-7 text-accent" />
+          <span className="text-lg font-extrabold tracking-tight">Prism</span>
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
