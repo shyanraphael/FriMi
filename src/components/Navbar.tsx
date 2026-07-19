@@ -83,39 +83,41 @@ export function Navbar() {
           </div>
         </form>
 
-        <button
-          onClick={toggle}
-          aria-label="Toggle theme"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full glass transition hover:scale-105 active:scale-95">
-          
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.span
-              key={theme}
-              initial={{ rotate: -90, opacity: 0 }}
-              animate={{ rotate: 0, opacity: 1 }}
-              exit={{ rotate: 90, opacity: 0 }}
-              transition={{ duration: 0.2 }}>
-              
-              {theme === 'dark' ?
-              <SunIcon className="h-4 w-4" /> :
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={toggle}
+            aria-label="Toggle theme"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full glass transition hover:scale-105 active:scale-95">
+            
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={theme}
+                initial={{ rotate: -90, opacity: 0 }}
+                animate={{ rotate: 0, opacity: 1 }}
+                exit={{ rotate: 90, opacity: 0 }}
+                transition={{ duration: 0.2 }}>
+                
+                {theme === 'dark' ?
+                <SunIcon className="h-4 w-4" /> :
 
-              <MoonIcon className="h-4 w-4" />
-              }
-            </motion.span>
-          </AnimatePresence>
-        </button>
+                <MoonIcon className="h-4 w-4" />
+                }
+              </motion.span>
+            </AnimatePresence>
+          </button>
 
-        <button
-          onClick={() => setMobileOpen((o) => !o)}
-          aria-label="Menu"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full glass md:hidden">
-          
-          {mobileOpen ?
-          <XIcon className="h-4 w-4" /> :
+          <button
+            onClick={() => setMobileOpen((o) => !o)}
+            aria-label="Menu"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full glass md:hidden">
+            
+            {mobileOpen ?
+            <XIcon className="h-4 w-4" /> :
 
-          <MenuIcon className="h-4 w-4" />
-          }
-        </button>
+            <MenuIcon className="h-4 w-4" />
+            }
+          </button>
+        </div>
       </div>
 
       <AnimatePresence>
