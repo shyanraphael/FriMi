@@ -1,0 +1,183 @@
+// -----------------------------------------------------------------------------
+// TMDB data layer — the "server" powering the movie / TV / anime catalog.
+// TMDB (https://www.themoviedb.org) is the industry-standard movie & TV API.
+// Swap API_KEY below with your own free key from https://www.themoviedb.org/settings/api
+// if the bundled key gets rate limited.
+// -----------------------------------------------------------------------------
+
+const API_KEY = '8265bd1679663a7ea12ac168da84d2e8';
+const BASE = 'https://api.themoviedb.org/3';
+
+export const IMG = {
+  poster: (path: string | null, size: 'w342' | 'w500' = 'w500') =>
+  path ? `https://image.tmdb.org/t/p/${size}${path}` : null,
+  backdrop: (path: string | null, size: 'w780' | 'w1280' | 'original' = 'w1280') =>
+  path ? `https://image.tmdb.org/t/p/${size}${path}` : null,
+  profile: (path: string | null) =>
+  path ? `https://image.tmdb.org/t/p/w185${path}` : null
+};
+
+export type MediaType = 'movie' | 'tv';
+
+export interface Media {
+  id: number;
+  title: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  vote_average: number;
+  release_date: string | null;
+  media_type: MediaType;
+  genre_ids?: number[];
+}
+
+export interface Genre {
+  id: number;
+  name: string;
+}
+
+export interface CastMember {
+  id: number;
+  name: string;
+  character: string;
+  profile_path: string | null;
+}
+
+export interface MediaDetail extends Media {
+  tagline: string | null;
+  runtime: number | null;
+  number_of_seasons?: number;
+  number_of_episodes?: number;
+  genres: Genre[];
+  cast: CastMember[];
+  trailerKey: string | null;
+  similar: Media[];
+  status: string;
+}
+
+// ---- normalization ----------------------------------------------------------
+function normalize(raw: any, fallbackType?: MediaType): Media {
+  const mediaType: MediaType =
+  (raw.media_type === 'movie' || raw.media_type === 'tv' ?
+  raw.media_type :
+  raw.title ?
+  'movie' :
+  raw.name ?
+  'tv' :
+  fallbackType) || 'movie';
+  return {
+    id: raw.id,
+    title: raw.title || raw.name || 'Untitled',
+    overview: raw.overview || '',
+    poster_path: raw.poster_path ?? null,
+    backdrop_path: raw.backdrop_path ?? null,
+    vote_average: raw.vote_average ?? 0,
+    release_date: raw.release_date || raw.first_air_date || null,
+    media_type: mediaType,
+    genre_ids: raw.genre_ids
+  };
+}
+
+async function get(path: string, params: Record<string, string | number> = {}) {
+  const url = new URL(`${BASE}${path}`);
+  url.searchParams.set('api_key', API_KEY);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`TMDB request failed: ${res.status}`);
+  return res.json();
+}
+
+// ---- endpoints --------------------------------------------------------------
+export async function getTrending(
+window: 'day' | 'week' = 'week')
+: Promise<Media[]> {
+  const data = await get(`/trending/all/${window}`);
+  return (data.results as any[]).
+  filter((r) => r.media_type === 'movie' || r.media_type === 'tv').
+  map((r) => normalize(r));
+}
+
+export async function getList(
+type: MediaType,
+category: string,
+page = 1)
+: Promise<Media[]> {
+  const data = await get(`/${type}/${category}`, { page });
+  return (data.results as any[]).map((r) => normalize(r, type));
+}
+
+// Anime = animation genre (16) sourced from Japan
+export async function getAnime(page = 1, sort = 'popularity.desc'): Promise<Media[]> {
+  const data = await get('/discover/tv', {
+    with_genres: 16,
+    with_original_language: 'ja',
+    sort_by: sort,
+    page
+  });
+  return (data.results as any[]).map((r) => normalize(r, 'tv'));
+}
+
+export async function discover(
+type: MediaType,
+opts: {genre?: number;sort?: string;page?: number;} = {})
+: Promise<{results: Media[];totalPages: number;}> {
+  const params: Record<string, string | number> = {
+    sort_by: opts.sort || 'popularity.desc',
+    page: opts.page || 1,
+    'vote_count.gte': 50
+  };
+  if (opts.genre) params.with_genres = opts.genre;
+  const data = await get(`/discover/${type}`, params);
+  return {
+    results: (data.results as any[]).map((r) => normalize(r, type)),
+    totalPages: Math.min(data.total_pages ?? 1, 500)
+  };
+}
+
+export async function getGenres(type: MediaType): Promise<Genre[]> {
+  const data = await get(`/genre/${type}/list`);
+  return data.genres as Genre[];
+}
+
+export async function searchMulti(query: string): Promise<Media[]> {
+  if (!query.trim()) return [];
+  const data = await get('/search/multi', { query });
+  return (data.results as any[]).
+  filter((r) => r.media_type === 'movie' || r.media_type === 'tv').
+  map((r) => normalize(r));
+}
+
+export async function getDetail(
+type: MediaType,
+id: number)
+: Promise<MediaDetail> {
+  const data = await get(`/${type}/${id}`, {
+    append_to_response: 'credits,videos,similar'
+  });
+  const trailer =
+  (data.videos?.results || []).find(
+    (v: any) => v.site === 'YouTube' && v.type === 'Trailer'
+  ) || (data.videos?.results || []).find((v: any) => v.site === 'YouTube');
+
+  return {
+    ...normalize(data, type),
+    tagline: data.tagline || null,
+    runtime: data.runtime ?? null,
+    number_of_seasons: data.number_of_seasons,
+    number_of_episodes: data.number_of_episodes,
+    status: data.status || '',
+    genres: data.genres || [],
+    cast: (data.credits?.cast || []).slice(0, 12).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      character: c.character,
+      profile_path: c.profile_path
+    })),
+    trailerKey: trailer?.key || null,
+    similar: (data.similar?.results || []).map((r: any) => normalize(r, type))
+  };
+}
+
+export function year(date: string | null): string {
+  return date ? date.slice(0, 4) : '—';
+}
