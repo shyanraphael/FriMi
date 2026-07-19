@@ -5,7 +5,7 @@
 // if the bundled key gets rate limited.
 // -----------------------------------------------------------------------------
 
-const API_KEY = '8265bd1679663a7ea12ac168da84d2e8';
+const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const BASE = 'https://api.themoviedb.org/3';
 
 export const IMG = {
@@ -14,7 +14,9 @@ export const IMG = {
   backdrop: (path: string | null, size: 'w780' | 'w1280' | 'original' = 'w1280') =>
   path ? `https://image.tmdb.org/t/p/${size}${path}` : null,
   profile: (path: string | null) =>
-  path ? `https://image.tmdb.org/t/p/w185${path}` : null
+  path ? `https://image.tmdb.org/t/p/w185${path}` : null,
+  providerLogo: (path: string | null) =>
+  path ? `https://image.tmdb.org/t/p/w92${path}` : null
 };
 
 export type MediaType = 'movie' | 'tv';
@@ -43,6 +45,19 @@ export interface CastMember {
   profile_path: string | null;
 }
 
+export interface WatchProvider {
+  provider_id: number;
+  provider_name: string;
+  logo_path: string | null;
+}
+
+export interface WatchProviders {
+  link: string | null;
+  flatrate: WatchProvider[];
+  rent: WatchProvider[];
+  buy: WatchProvider[];
+}
+
 export interface MediaDetail extends Media {
   tagline: string | null;
   runtime: number | null;
@@ -51,6 +66,7 @@ export interface MediaDetail extends Media {
   genres: Genre[];
   cast: CastMember[];
   trailerKey: string | null;
+  watchProviders: WatchProviders | null;
   similar: Media[];
   status: string;
 }
@@ -152,12 +168,24 @@ type: MediaType,
 id: number)
 : Promise<MediaDetail> {
   const data = await get(`/${type}/${id}`, {
-    append_to_response: 'credits,videos,similar'
+    append_to_response: 'credits,videos,similar,watch/providers'
   });
   const trailer =
   (data.videos?.results || []).find(
     (v: any) => v.site === 'YouTube' && v.type === 'Trailer'
   ) || (data.videos?.results || []).find((v: any) => v.site === 'YouTube');
+
+  const region = (navigator.language.split('-')[1] || 'US').toUpperCase();
+  const providersByRegion = data['watch/providers']?.results || {};
+  const regionProviders = providersByRegion[region] || providersByRegion['US'] || null;
+  const watchProviders: WatchProviders | null = regionProviders ?
+  {
+    link: regionProviders.link || null,
+    flatrate: regionProviders.flatrate || [],
+    rent: regionProviders.rent || [],
+    buy: regionProviders.buy || []
+  } :
+  null;
 
   return {
     ...normalize(data, type),
@@ -174,6 +202,7 @@ id: number)
       profile_path: c.profile_path
     })),
     trailerKey: trailer?.key || null,
+    watchProviders,
     similar: (data.similar?.results || []).map((r: any) => normalize(r, type))
   };
 }
